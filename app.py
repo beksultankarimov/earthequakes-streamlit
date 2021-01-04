@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import gspread
-from gspread_dataframe import get_as_dataframe, set_with_dataframe
+
 
 #connecting to the database
 
