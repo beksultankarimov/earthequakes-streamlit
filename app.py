@@ -42,7 +42,7 @@ depth_mode = database_dfs.Depthkm.mode()[0]
 
 st.write("""
 # Worldwide Earthquake Monitor
-This app shows earthquakes happening wordlwide!
+This app shows earthquakes happening wordlwide! It's the first version of app, in upcoming updates it's planned to incorporate interactive map instead of tables.
 Data obtained from the https://www.emsc-csem.org/Earthquake/seismologist.php """)
 
 st.sidebar.header('User Filters')
