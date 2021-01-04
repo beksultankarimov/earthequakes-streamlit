@@ -48,8 +48,8 @@ Data obtained from the https://www.emsc-csem.org/Earthquake/seismologist.php """
 st.sidebar.header('User Filters')
 
 st.sidebar.markdown("""
-[Here will be a link to the Google Sheets database]
-(https://docs.google.com/spreadsheets/d/1RaqpQoE2kw_crnfspZJ8SH3bnouuT7y4GhvizJ5agdM/edit#gid=0)
+[Here is the database used for the app]
+(https://github.com/beksultankarimov/earthequakes-streamlit/blob/main/Earthquake_database.xls)
 """)
 
 # Collects user input features into dataframe
