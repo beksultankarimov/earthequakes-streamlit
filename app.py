@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import xlrd
+import pydeck as pdk
 
 
 #connecting to the database
@@ -56,7 +58,7 @@ st.sidebar.markdown("""
 
 def user_input_features():
     mag_type = st.sidebar.selectbox('Magnitude type',magnitude_types_unique)
-    magnitude = st.sidebar.selectbox('Magnitude', (1,2,3,4,5,6,7,'8+'))
+    magnitude = st.sidebar.selectbox('Magnitude', ('All', 1,2,3,4,5,6,7,'8+'))
     start_date = st.sidebar.date_input('Start Date',least_recent_date)
     end_date = st.sidebar.date_input('End Date',recent_date)
     if start_date <= end_date:
@@ -70,24 +72,86 @@ def user_input_features():
             'end_date': end_date}
 
     return data
-input_data = user_input_features()
+
 
 
 
 st.subheader('Filter result')
-
+input_data = user_input_features()
 if input_data['mag_type']!='All':
     result_df = database_dfs.loc[database_dfs.Mag == input_data['mag_type']]
 else:
     result_df = database_dfs
 
 
-if input_data['magnitude'] != '8+':
-    result_df = result_df.loc[(result_df.Mag_number >= input_data['magnitude']) & 
-    (result_df.Mag_number < input_data['magnitude']+1)] 
-else: 
-    result_df = result_df.loc[result_df.Mag_number >= 8]
+if input_data['magnitude'] != 'All':
+    if input_data['magnitude'] != '8+':
+        result_df = result_df.loc[(result_df.Mag_number >= input_data['magnitude']) & 
+        (result_df.Mag_number < input_data['magnitude']+1)] 
+    else: 
+        result_df = result_df.loc[result_df.Mag_number >= 8]
+else: result_df = database_dfs
+
 
 result_df = result_df.loc[(result_df.Date  >= input_data['start_date']) & (result_df.Date  <= input_data['end_date'])]
 
-st.write(result_df.drop(['Upload_time', 'Date'], axis=1).sort_values(by='Date_TimeUTC'))
+#st.write(result_df.drop(['Upload_time', 'Date'], axis=1).sort_values(by='Date_TimeUTC'))
+
+
+# Map
+
+st.write("Eearthquakes happeed between: ", input_data['start_date']," and ",input_data['end_date'])
+
+midpoint = (np.average(result_df.latitude), np.average(result_df.longitude))
+#st.map(result_df)
+
+#map with column plot
+st.write(pdk.Deck(
+    map_style="mapbox://styles/mapbox/light-v9",
+    initial_view_state={
+        "latitude": midpoint[0],
+        "longitude": midpoint[1],
+        "zoom": 0,
+        "pitch": 40,
+    },
+    layers=[
+        pdk.Layer(
+        "HexagonLayer",
+        data=result_df[['Date_TimeUTC', 'latitude', 'longitude']],
+        get_position=["longitude", "latitude"],
+        auto_highlight=True,
+        radius=50000,
+        extruded=True,
+        pickable=True,
+        elevation_scale=4,
+        elevation_range=[0, 100000],
+        ),
+    ],
+))
+
+
+
+
+
+"""view_state = pdk.ViewState(latitude=midpoint[0], longitude=midpoint[0], zoom=4, min_zoom=1)
+view  = pdk.View(type="_GlobeView", controller=True, width=1200, height=700)
+layers=[
+    pdk.Layer(
+        "HexagonLayer",
+        data=result_df[["Mag_number","longitude", "latitude"]],
+        get_elevation="Mag_number",
+        get_position=["longitude", "latitude"],
+        radius=20000,
+        elevation_scale=100,
+        #elevation_range=[0, 10],
+        pickable=True,
+        auto_highlight=True,
+        ),
+]
+st.write(pdk.Deck(
+    views=[view],
+    initial_view_state=view_state,
+    layers=layers,
+    # Note that this must be set for the globe to be opaque
+    parameters={"cull": True},
+))"""
