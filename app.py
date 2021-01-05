@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import xlrd
-import pydeck as pdk
+import reverse_geocoder as rg
+import time
+import altair as alt
 
 
 #connecting to the database
@@ -41,6 +43,11 @@ depth_min = database_dfs.Depthkm.min()
 depth_max = database_dfs.Depthkm.max() 
 depth_mode = database_dfs.Depthkm.mode()[0]
 
+regions = ['All']
+regions_list = (database_dfs.Region_name.dropna().unique())
+for i in np.unique(regions_list):
+    regions.append(i)
+regions = tuple(regions)
 
 st.write("""
 # Worldwide Earthquake Monitor
@@ -61,6 +68,8 @@ def user_input_features():
     magnitude = st.sidebar.selectbox('Magnitude', ('All', 1,2,3,4,5,6,7,'8+'))
     start_date = st.sidebar.date_input('Start Date',least_recent_date)
     end_date = st.sidebar.date_input('End Date',recent_date)
+    
+
     if start_date <= end_date:
         st.success('Start date: `%s`\n\nEnd date:`%s`' % (start_date, end_date))
     else:
@@ -75,8 +84,8 @@ def user_input_features():
 
 
 
-
 st.subheader('Filter result')
+
 input_data = user_input_features()
 if input_data['mag_type']!='All':
     result_df = database_dfs.loc[database_dfs.Mag == input_data['mag_type']]
@@ -95,63 +104,68 @@ else: result_df = database_dfs
 
 result_df = result_df.loc[(result_df.Date  >= input_data['start_date']) & (result_df.Date  <= input_data['end_date'])]
 
-#st.write(result_df.drop(['Upload_time', 'Date'], axis=1).sort_values(by='Date_TimeUTC'))
 
 
 # Map
-
 st.write("Eearthquakes happeed between: ", input_data['start_date']," and ",input_data['end_date'])
+st.map(result_df)
 
-midpoint = (np.average(result_df.latitude), np.average(result_df.longitude))
-#st.map(result_df)
-
-#map with column plot
-st.write(pdk.Deck(
-    map_style="mapbox://styles/mapbox/light-v9",
-    initial_view_state={
-        "latitude": midpoint[0],
-        "longitude": midpoint[1],
-        "zoom": 0,
-        "pitch": 40,
-    },
-    layers=[
-        pdk.Layer(
-        "HexagonLayer",
-        data=result_df[['Date_TimeUTC', 'latitude', 'longitude']],
-        get_position=["longitude", "latitude"],
-        auto_highlight=True,
-        radius=50000,
-        extruded=True,
-        pickable=True,
-        elevation_scale=4,
-        elevation_range=[0, 100000],
-        ),
-    ],
-))
+#Timeseries
+if st.checkbox("Show Timeseries data", False):
+    crostab_by_date = pd.crosstab(index = result_df['Date'], columns='Count').reset_index()#.sort_values(by='Date', ascending = False)
+    count = crostab_by_date.Count
+    crostab_by_date.Date = pd.to_datetime(crostab_by_date.Date)
+    
+    chart = (alt.Chart(crostab_by_date)
+            .mark_area(opacity=0.3)
+            .encode(
+                x="Date",
+                y='Count'                
+                )
+            )
+    st.altair_chart(chart, use_container_width=True)
 
 
 
+#Raw data display
+if st.checkbox("Show Raw Data", False):
+    st.subheader('Raw Data')
+    st.write("Number of Earthquakes: %i" % result_df.shape[0])
+    st.write(result_df.drop(['Upload_time', 'Date'], axis=1).sort_values(by='Date_TimeUTC'))
 
 
-"""view_state = pdk.ViewState(latitude=midpoint[0], longitude=midpoint[0], zoom=4, min_zoom=1)
-view  = pdk.View(type="_GlobeView", controller=True, width=1200, height=700)
-layers=[
-    pdk.Layer(
-        "HexagonLayer",
-        data=result_df[["Mag_number","longitude", "latitude"]],
-        get_elevation="Mag_number",
-        get_position=["longitude", "latitude"],
-        radius=20000,
-        elevation_scale=100,
-        #elevation_range=[0, 10],
-        pickable=True,
-        auto_highlight=True,
-        ),
-]
-st.write(pdk.Deck(
-    views=[view],
-    initial_view_state=view_state,
-    layers=layers,
-    # Note that this must be set for the globe to be opaque
-    parameters={"cull": True},
-))"""
+if st.sidebar.checkbox("Show Data By Region", False):
+    region = st.sidebar.multiselect('Select a region', regions)
+    if 'All' not in region:
+        result_df_region = result_df.drop(['Upload_time'], axis=1)
+        result_df_region = result_df_region.loc[result_df_region.Region_name.isin(region)]
+        st.write("Number of Earthquakes in chosen region(s) %i" % result_df_region.shape[0])
+        st.map(result_df_region)
+
+        regions_df = {}
+        regions_df = {elem : pd.DataFrame() for elem in region}
+        for i in regions_df:
+            regions_df[i] = pd.DataFrame(result_df_region.loc[result_df_region.Region_name == i])
+        for i in regions_df:
+            crostab_by_date_region = pd.crosstab(index = regions_df[i]['Date'], columns='Count').reset_index()
+            count = crostab_by_date_region.Count
+            crostab_by_date_region.Date = pd.to_datetime(crostab_by_date_region.Date)
+            
+
+            chart = (alt.Chart(crostab_by_date_region)
+                    .mark_area(opacity=0.3)
+                    .encode(
+                        x="Date",
+                        y='Count',
+                        
+                        )
+                    )
+            st.write(i)
+            st.write(crostab_by_date_region)
+            st.altair_chart(chart, use_container_width=True)
+    else:
+        result_df_region = result_df
+        st.write("Number of Earthquakes in chosen region(s) %i" % result_df_region.shape[0])
+        st.map(result_df_region)
+    if st.checkbox("Show Raw Data By Region", False):
+        st.write(result_df_region.sort_values(by= 'Date_TimeUTC'))
