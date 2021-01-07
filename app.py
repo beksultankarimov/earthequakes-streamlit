@@ -1,56 +1,24 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import xlrd
 import altair as alt
+import datetime as dt
+import time
+
+#reading csv file with data
+df = pd.read_csv('data_clean.csv')
+
+#convirting to datetime
+df.date_time_utc = pd.to_datetime(df.date_time_utc, utc=True)
+df['Date'] = df['date_time_utc'].dt.date
 
 
-#connecting to the database
-
-mag1_df = pd.read_excel('Earthquake_database.xls',sheet_name='Sheet1')
-mag2_df = pd.read_excel('Earthquake_database.xls',sheet_name='Sheet2')
-mag3_df = pd.read_excel('Earthquake_database.xls',sheet_name='Sheet3')
-mag4_df = pd.read_excel('Earthquake_database.xls',sheet_name='Sheet4')
-mag5_df = pd.read_excel('Earthquake_database.xls',sheet_name='Sheet5')
-
-database_dfs = pd.concat([mag1_df,mag2_df,mag3_df,mag4_df, mag5_df])
-
-#getting the entry with the latest date from database_df
-database_dfs['Date_TimeUTC'] = pd.to_datetime(database_dfs['Date_TimeUTC'])
-database_dfs['Date'] = database_dfs['Date_TimeUTC'].dt.date
-recent_date = database_dfs['Date_TimeUTC'].max()
-least_recent_date = database_dfs['Date_TimeUTC'].min()
-
-#getting unique magnitude types for sidebar
-magnitude_types = (database_dfs.Mag.dropna().unique())
-magnitude_types = [w.upper() for w in magnitude_types]
-magnitude_types_unique = ['All']
-for i in np.unique(magnitude_types):
-    magnitude_types_unique.append(i)
-magnitude_types_unique = tuple(magnitude_types_unique)
-
-#getting magnitude range for slidebar
-Mag_number = database_dfs.Mag_number.astype('float')
-magnitude_min = database_dfs.Mag_number.min() 
-magnitude_max = database_dfs.Mag_number.max() 
-magnitude_mode = database_dfs.Mag_number.mode()[0]
-
-#getting depth range for slidebar
-database_dfs.Depthkm = database_dfs.Depthkm.astype('float')
-depth_min = database_dfs.Depthkm.min() 
-depth_max = database_dfs.Depthkm.max() 
-depth_mode = database_dfs.Depthkm.mode()[0]
-
-regions = ['All']
-regions_list = (database_dfs.Region_name.dropna().unique())
-for i in np.unique(regions_list):
-    regions.append(i)
-regions = tuple(regions)
 
 st.write("""
 # Worldwide Earthquake Monitor
-This app shows earthquakes happening wordlwide! It's the first version of app, in upcoming updates it's planned to incorporate interactive map instead of tables.
-Data obtained from the https://www.emsc-csem.org/Earthquake/seismologist.php """)
+## This app shows earthquakes wordlwide! 
+It's the first version of app, in upcoming updates it's planned to incorporate interactive map instead of tables.
+Data obtained from the https://www.emsc-csem.org """)
 
 st.sidebar.header('User Filters')
 
@@ -59,111 +27,172 @@ st.sidebar.markdown("""
 (https://github.com/beksultankarimov/earthequakes-streamlit/blob/main/Earthquake_database.xls)
 """)
 
-# Collects user input features into dataframe
 
-def user_input_features():
-    mag_type = st.sidebar.selectbox('Magnitude type',magnitude_types_unique)
-    magnitude = st.sidebar.selectbox('Magnitude', ('All', 1,2,3,4,5,6,7,'8+'))
-    start_date = st.sidebar.date_input('Start Date',least_recent_date)
+        
+
+result_df = df
+result_df = result_df[['date_time_utc','latitude', 'longitude', 'depth', 'magnitude_type',
+        'magnitude', 'region_name', 'Countries']]
+##################################################################################################
+if st.sidebar.checkbox("Filter by Date/time", False):
+    #getting the entry with the latest date from df
+    recent_date = df['date_time_utc'].max()
+    least_recent_date = df['date_time_utc'].min()
+
+    #Filter df by date
+    start_date = st.sidebar.date_input('Start Date',recent_date)
     end_date = st.sidebar.date_input('End Date',recent_date)
-    
 
-    if start_date <= end_date:
-        st.success('Start date: `%s`\n\nEnd date:`%s`' % (start_date, end_date))
-    else:
+    if start_date > end_date:
         st.error('Error: End date must fall after start date.')
-    
-    data = {'mag_type': mag_type,
-            'magnitude': magnitude,
-            'start_date':start_date,
-            'end_date': end_date}
-
-    return data
 
 
+    result_df = result_df.loc[(result_df.date_time_utc.dt.date  >= start_date) & (result_df.date_time_utc.dt.date  <= end_date)]
 
-st.subheader('Filter result')
+    ##########################################################################################################
+    #filtering by time
+    Start_time = None
+    End_time = None
 
-input_data = user_input_features()
-if input_data['mag_type']!='All':
-    result_df = database_dfs.loc[database_dfs.Mag == input_data['mag_type']]
+    if st.sidebar.checkbox("Filter by time", False):
+        start_time = st.sidebar.time_input('Start Time', result_df.date_time_utc.dt.time.min())
+        end_time = st.sidebar.time_input('End Time',result_df.date_time_utc.dt.time.max())
+        result_df.index = result_df.date_time_utc
+        result_df = result_df.between_time(str(start_time)[:5], str(end_time)[:5])      
+        result_df = result_df[['latitude', 'longitude', 'depth', 'magnitude_type',
+        'magnitude', 'region_name', 'Countries']]
+        Start_time = start_time
+        End_time = end_time
+        
+    else:
+        result_df = result_df[['date_time_utc','latitude', 'longitude', 'depth', 'magnitude_type',
+        'magnitude', 'region_name', 'Countries']]
 else:
-    result_df = database_dfs
+    last_date = recent_date = df['Date'].max()
+    result_df = result_df.loc[result_df.date_time_utc.dt.date >= last_date]
+
+#########################################################################################################
+
+#getting unique magnitude types for sidebar
+if st.sidebar.checkbox("Filter by magnitude", False):
+    magnitude_types = (result_df.magnitude_type.sort_values().unique())
+    magnitude_types_unique = ['All']
+    for i in np.unique(magnitude_types):
+        magnitude_types_unique.append(i)
+    magnitude_types_unique = tuple(magnitude_types_unique)
+
+    #Mgnitude_type filter
+    mag_type = st.sidebar.selectbox('Magnitude type',magnitude_types_unique)
+    if mag_type !='All':
+        result_df = result_df.loc[result_df.magnitude_type == mag_type]
+    else:
+        result_df = result_df
 
 
-if input_data['magnitude'] != 'All':
-    if input_data['magnitude'] != '8+':
-        result_df = result_df.loc[(result_df.Mag_number >= input_data['magnitude']) & 
-        (result_df.Mag_number < input_data['magnitude']+1)] 
-    else: 
-        result_df = result_df.loc[result_df.Mag_number >= 8]
-else: result_df = database_dfs
+    #########################################################################################################   
 
+    #Magnitude filter
 
-result_df = result_df.loc[(result_df.Date  >= input_data['start_date']) & (result_df.Date  <= input_data['end_date'])]
+    #values for the first filter
+    magnitude_list = result_df.magnitude.sort_values().astype('int').unique()
+    magnitude_unique = ['All']
+    for i in magnitude_list:
+        magnitude_unique.append(i)
+    magnitude_unique = tuple(magnitude_unique)
 
+    #values for the second filter
+    separate_mag_list = ['None']
+    for i in magnitude_list:
+        separate_mag_list.append(i)
+    separate_mag_list = tuple(separate_mag_list)
 
-
-# Map
-st.write("Eearthquakes happeed between: ", input_data['start_date']," and ",input_data['end_date'])
-st.map(result_df)
-
-#Timeseries
-if st.checkbox("Show Timeseries data", False):
-    crostab_by_date = pd.crosstab(index = result_df['Date'], columns='Count').reset_index()#.sort_values(by='Date', ascending = False)
-    count = crostab_by_date.Count
-    crostab_by_date.Date = pd.to_datetime(crostab_by_date.Date)
     
-    chart = (alt.Chart(crostab_by_date)
-            .mark_area(opacity=0.3)
-            .encode(
-                x="Date",
-                y='Count'                
-                )
-            )
-    st.altair_chart(chart, use_container_width=True)
+    mag_filters = st.sidebar.selectbox('Choose a filter: ',('Filter by fixed magnitude', 'Filter by magnitude range'))
+    if mag_filters == 'Filter by fixed magnitude':
+        magnitude = st.sidebar.selectbox('Magnitude', magnitude_unique)
+        if magnitude != 'All':
+            result_df = result_df.loc[(result_df.magnitude >= magnitude) & 
+                (result_df.magnitude < magnitude+1)] 
+        else: result_df = result_df
+    else:
+        min_magnitude = st.sidebar.selectbox('Minimum Magnitude', separate_mag_list)
+        if min_magnitude != 'None':
+            result_df =  result_df.loc[result_df.magnitude >= min_magnitude] 
+        else: result_df = result_df
 
+        max_magnitude = st.sidebar.selectbox('Maximum Magnitude', separate_mag_list)
+        if max_magnitude != 'None':
+            result_df =  result_df.loc[result_df.magnitude < max_magnitude+1] 
+        else: result_df = result_df
 
+#####################################################################################################
 
+if st.sidebar.checkbox("Filter by Location", False):
+    main_filter = st.sidebar.selectbox("Show Entire World/Region", ('Entire World', 'By Country/Border/Sea'))
+    if main_filter == 'Entire World':
+        result_df = result_df
+
+    else:
+        countries = tuple(result_df.Countries.sort_values().unique())
+
+        country = st.sidebar.multiselect('Select a Country/Border/Sea', countries)
+        if country !=None:
+            result_df = result_df.loc[df.Countries.isin(country)]
+            
+            countries_df = {}
+            countries_df = {elem : pd.DataFrame() for elem in country}
+            for i in countries_df:
+                countries_df[i] = pd.DataFrame(result_df.loc[result_df.Countries == i])
+
+            #stats by chosen country    
+            if len(country)>1:
+                if st.checkbox("Show Statistical Data Per Chosen Country", False):
+                    for i in countries_df:
+                        st.write('Stats of', i)
+                        st.write(countries_df[i])
+
+            #subcategory of Countries
+            if len(result_df.Countries.unique())==1:
+                if len(result_df.region_name.unique())>1:
+                    regions = ['All']
+                    for i in result_df.region_name.sort_values().unique():
+                        regions.append(i)
+                    regions = tuple(regions)
+
+                    region = st.sidebar.multiselect('Select region', regions)
+                    if 'All' not in region:
+                        result_df = result_df.loc[df.region_name.isin(region)]
+
+                        region_df = {}
+                        region_df = {elem : pd.DataFrame() for elem in region}
+                        for i in region_df:
+                            region_df[i] = pd.DataFrame(result_df.loc[result_df.region_name == i])
+                        
+                        if len(result_df.region_name.sort_values().unique())>1:
+                            if st.checkbox("Show Statistical Data Per Chosen Region", False):
+                                for i in region_df:
+                                    st.write('Stats of', i)
+                                    st.write(region_df[i])
+                    else:
+                        result_df = result_df
+
+                        region_df = {}
+                        region_df = {elem : pd.DataFrame() for elem in result_df.region_name.sort_values().unique()}
+                        for i in region_df:
+                            region_df[i] = pd.DataFrame(result_df.loc[result_df.region_name == i])
+                        if st.checkbox("Show Statistical Data Per Chosen Region", False):
+                                for i in region_df:
+                                    st.write('Stats of', i)
+                                    st.write(region_df[i])
+        else:
+            result_df = result_df
+#########################################################################################################
+
+st.write('### Filter results: : ' ,result_df.shape[0], ' earthquakes detected')
+st.write('### From (date): `%s` To (date):`%s`' % (result_df['date_time_utc'].dt.date.min(), result_df['date_time_utc'].dt.date.max()))
+# Map
+st.map(result_df)
 #Raw data display
 if st.checkbox("Show Raw Data", False):
     st.subheader('Raw Data')
-    st.write("Number of Earthquakes: %i" % result_df.shape[0])
-    st.write(result_df.drop(['Upload_time', 'Date'], axis=1).sort_values(by='Date_TimeUTC'))
-
-
-if st.sidebar.checkbox("Show Data By Region", False):
-    region = st.sidebar.multiselect('Select a region', regions)
-    if 'All' not in region:
-        result_df_region = result_df.drop(['Upload_time'], axis=1)
-        result_df_region = result_df_region.loc[result_df_region.Region_name.isin(region)]
-        st.write("Number of Earthquakes in chosen region(s) %i" % result_df_region.shape[0])
-        st.map(result_df_region)
-
-        regions_df = {}
-        regions_df = {elem : pd.DataFrame() for elem in region}
-        for i in regions_df:
-            regions_df[i] = pd.DataFrame(result_df_region.loc[result_df_region.Region_name == i])
-        for i in regions_df:
-            crostab_by_date_region = pd.crosstab(index = regions_df[i]['Date'], columns='Count').reset_index()
-            count = crostab_by_date_region.Count
-            crostab_by_date_region.Date = pd.to_datetime(crostab_by_date_region.Date)
-            
-
-            chart = (alt.Chart(crostab_by_date_region)
-                    .mark_area(opacity=0.3)
-                    .encode(
-                        x="Date",
-                        y='Count',
-                        
-                        )
-                    )
-            st.write(i)
-            st.write(crostab_by_date_region)
-            st.altair_chart(chart, use_container_width=True)
-    else:
-        result_df_region = result_df
-        st.write("Number of Earthquakes in chosen region(s) %i" % result_df_region.shape[0])
-        st.map(result_df_region)
-    if st.checkbox("Show Raw Data By Region", False):
-        st.write(result_df_region.sort_values(by= 'Date_TimeUTC'))
+    st.write(result_df)
