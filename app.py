@@ -31,8 +31,8 @@ st.sidebar.markdown("""
         
 
 result_df = df
-result_df = result_df[['date_time_utc','latitude', 'longitude', 'depth', 'magnitude_type',
-        'magnitude', 'region_name', 'Countries']]
+result_df = result_df[['date_time_utc', 'Countries', 'region_name', 'magnitude_type',
+        'magnitude', 'depth','latitude', 'longitude']]
 ##################################################################################################
 if st.sidebar.checkbox("Filter by Date/time", False):
     #getting the entry with the latest date from df
@@ -59,14 +59,12 @@ if st.sidebar.checkbox("Filter by Date/time", False):
         end_time = st.sidebar.time_input('End Time',result_df.date_time_utc.dt.time.max())
         result_df.index = result_df.date_time_utc
         result_df = result_df.between_time(str(start_time)[:5], str(end_time)[:5])      
-        result_df = result_df[['latitude', 'longitude', 'depth', 'magnitude_type',
-        'magnitude', 'region_name', 'Countries']]
+        
         Start_time = start_time
         End_time = end_time
         
     else:
-        result_df = result_df[['date_time_utc','latitude', 'longitude', 'depth', 'magnitude_type',
-        'magnitude', 'region_name', 'Countries']]
+        result_df = result_df
 else:
     last_date = recent_date = df['Date'].max()
     result_df = result_df.loc[result_df.date_time_utc.dt.date >= last_date]
