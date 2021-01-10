@@ -214,6 +214,7 @@ st.write('''\n[Check the data cleaning Jupiter Notebook here](https://github.com
 st.write('''\n[Check the EDA Jupiter Notebook here](https://github.com/beksultankarimov/earthequakes-streamlit/blob/main/Earthquake_EDA.ipynb)''')
 st.write('___________________________________________________________________________________________________')
 st.write('This project was done by: **Beksultan Karimov**')
+st.write('''\n[Get my CV](https://drive.google.com/file/d/11eKUFQ7bkNhGj4upd4l9uAfBkpZyTvJY/view?usp=sharing)''')
 st.write('''\n[LinkedIn](https://www.linkedin.com/in/beksultan-karimov-6a4296179/)''')
 st.write('''[Facebook](https://www.facebook.com/profile.php?id=100009130718211)''')
 st.write('''[GitHub](https://github.com/beksultankarimov)''')
