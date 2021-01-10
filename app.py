@@ -31,8 +31,8 @@ st.sidebar.markdown("""
         
 
 result_df = df
-result_df = result_df[['date_time_utc', 'Countries', 'region_name', 'magnitude_type',
-        'magnitude', 'depth','latitude', 'longitude']]
+result_df = result_df[['date_time_utc','latitude', 'longitude', 'depth', 'magnitude_type',
+        'magnitude', 'region_name', 'Countries']]
 ##################################################################################################
 if st.sidebar.checkbox("Filter by Date/time", False):
     #getting the entry with the latest date from df
@@ -59,12 +59,14 @@ if st.sidebar.checkbox("Filter by Date/time", False):
         end_time = st.sidebar.time_input('End Time',result_df.date_time_utc.dt.time.max())
         result_df.index = result_df.date_time_utc
         result_df = result_df.between_time(str(start_time)[:5], str(end_time)[:5])      
-        
+        result_df = result_df[['latitude', 'longitude', 'depth', 'magnitude_type',
+        'magnitude', 'region_name', 'Countries']]
         Start_time = start_time
         End_time = end_time
         
     else:
-        result_df = result_df
+        result_df = result_df[['date_time_utc','latitude', 'longitude', 'depth', 'magnitude_type',
+        'magnitude', 'region_name', 'Countries']]
 else:
     last_date = recent_date = df['Date'].max()
     result_df = result_df.loc[result_df.date_time_utc.dt.date >= last_date]
@@ -134,17 +136,13 @@ if st.sidebar.checkbox("Filter by Location", False):
         countries = tuple(result_df.Countries.sort_values().unique())
 
         country = st.sidebar.multiselect('Select a Country/Border/Sea', countries)
-        if len(country) == 1:
-            result_df = result_df.loc[result_df.Countries == country[0]]
-            
-        elif len(country) >1:
-            result_df = result_df.loc[result_df.Countries.isin(country)]
+        if country !=None:
+            result_df = result_df.loc[df.Countries.isin(country)]
             
             countries_df = {}
             countries_df = {elem : pd.DataFrame() for elem in country}
             for i in countries_df:
                 countries_df[i] = pd.DataFrame(result_df.loc[result_df.Countries == i])
-
 
             #stats by chosen country    
             if len(country)>1:
@@ -163,7 +161,7 @@ if st.sidebar.checkbox("Filter by Location", False):
 
                     region = st.sidebar.multiselect('Select region', regions)
                     if 'All' not in region:
-                        result_df = result_df.loc[result_df.region_name.isin(region)]
+                        result_df = result_df.loc[df.region_name.isin(region)]
 
                         region_df = {}
                         region_df = {elem : pd.DataFrame() for elem in region}
@@ -197,4 +195,4 @@ st.map(result_df)
 #Raw data display
 if st.checkbox("Show Raw Data", False):
     st.subheader('Raw Data')
-    st.write(result_df.drop('date_time_utc', axis=1))
+    st.write(result_df)
