@@ -3,45 +3,57 @@ import pandas as pd
 import numpy as np
 import altair as alt
 import datetime as dt
+from datetime import datetime, timedelta
 import time
+import dateutil
 
+
+@st.cache(allow_output_mutation=True)
+def get_data(df):
+    df = pd.read_csv('data_clean.csv', index_col=0)
+    return df
 #reading csv file with data
-df = pd.read_csv('data_clean.csv')
+df = None
+df = get_data(df)
 
 #convirting to datetime
-df.date_time_utc = pd.to_datetime(df.date_time_utc, utc=True)
+df['date_time_utc'] = pd.to_datetime(df.date_time_utc, utc = True)
 df['Date'] = df['date_time_utc'].dt.date
 
 
 
 st.write("""
 # Worldwide Earthquake Monitor
-## This app shows earthquakes wordlwide! 
-It's the first version of app, in upcoming updates it's planned to incorporate interactive map instead of tables.
+It's the first version of app, in upcoming updates it's planned to incorporate visualy pleasing charts instead of tables.\n
 Data obtained from the https://www.emsc-csem.org """)
 
-st.sidebar.header('User Filters')
+#visually dividing section
+st.write('___________________________________________________________________________________________________')
 
+st.sidebar.header('Apply Filters')
 st.sidebar.markdown("""
-[Here is the database used for the app]
-(https://github.com/beksultankarimov/earthequakes-streamlit/blob/main/Earthquake_database.xls)
+[Source code(GitHub)]
+(https://github.com/beksultankarimov/earthequakes-streamlit)
 """)
 
 
         
 
 result_df = df
-result_df = result_df[['date_time_utc','latitude', 'longitude', 'depth', 'magnitude_type',
-        'magnitude', 'region_name', 'Countries']]
+result_df = result_df[['date_time_utc', 'Countries', 'region_name', 'magnitude_type',
+        'magnitude', 'depth','latitude', 'longitude']]
+result_df.index = result_df.date_time_utc
 ##################################################################################################
-if st.sidebar.checkbox("Filter by Date/time", False):
-    #getting the entry with the latest date from df
-    recent_date = df['date_time_utc'].max()
-    least_recent_date = df['date_time_utc'].min()
+# filter by year
 
+target_year = st.sidebar.selectbox('Choose target year:', tuple(result_df.date_time_utc.dt.year.sort_values(ascending=False).unique()))
+result_df = result_df.loc[(result_df.date_time_utc.dt.year >= target_year) & (result_df.date_time_utc.dt.year < target_year+1)]
+
+##################################################################################################
+if st.sidebar.checkbox("Filter by Date", False):
     #Filter df by date
-    start_date = st.sidebar.date_input('Start Date',recent_date)
-    end_date = st.sidebar.date_input('End Date',recent_date)
+    start_date = st.sidebar.date_input('Start Date',result_df.date_time_utc.min())
+    end_date = st.sidebar.date_input('End Date',result_df.date_time_utc.max())
 
     if start_date > end_date:
         st.error('Error: End date must fall after start date.')
@@ -49,32 +61,27 @@ if st.sidebar.checkbox("Filter by Date/time", False):
 
     result_df = result_df.loc[(result_df.date_time_utc.dt.date  >= start_date) & (result_df.date_time_utc.dt.date  <= end_date)]
 
-    ##########################################################################################################
-    #filtering by time
-    Start_time = None
-    End_time = None
-
-    if st.sidebar.checkbox("Filter by time", False):
-        start_time = st.sidebar.time_input('Start Time', result_df.date_time_utc.dt.time.min())
-        end_time = st.sidebar.time_input('End Time',result_df.date_time_utc.dt.time.max())
-        result_df.index = result_df.date_time_utc
-        result_df = result_df.between_time(str(start_time)[:5], str(end_time)[:5])      
-        result_df = result_df[['latitude', 'longitude', 'depth', 'magnitude_type',
-        'magnitude', 'region_name', 'Countries']]
-        Start_time = start_time
-        End_time = end_time
-        
-    else:
-        result_df = result_df[['date_time_utc','latitude', 'longitude', 'depth', 'magnitude_type',
-        'magnitude', 'region_name', 'Countries']]
-else:
-    last_date = recent_date = df['Date'].max()
-    result_df = result_df.loc[result_df.date_time_utc.dt.date >= last_date]
 
 #########################################################################################################
 
 #getting unique magnitude types for sidebar
 if st.sidebar.checkbox("Filter by magnitude", False):
+
+    if st.sidebar.checkbox("Magnitude types reference list", False):
+        mag_description = pd.read_csv('magnitudes_description.csv')
+        mag_description = mag_description[['Magnitude Type', 'Magnitude Range', 'Comments', 'Distance Range', 'Equation']]
+        mag_type_decsr = st.sidebar.selectbox('Magnitude type definition', tuple(mag_description['Magnitude Type'].sort_values()))
+        if mag_type_decsr != None:
+            mag_description = mag_description.loc[mag_description['Magnitude Type'] ==  mag_type_decsr]
+            st.write('### **The description of** ', mag_type_decsr, ' magnitude type:')
+            st.write(mag_description['Comments'].values[0])
+            st.write('**Equation:** ', mag_description['Equation'].values[0])
+            st.write('**Magnitude Range:** ', mag_description['Magnitude Range'].values[0])
+            st.write('**Distance Range:** ', mag_description['Distance Range'].values[0])
+            #visually dividing section
+            st.write('___________________________________________________________________________________________________')
+
+
     magnitude_types = (result_df.magnitude_type.sort_values().unique())
     magnitude_types_unique = ['All']
     for i in np.unique(magnitude_types):
@@ -136,13 +143,17 @@ if st.sidebar.checkbox("Filter by Location", False):
         countries = tuple(result_df.Countries.sort_values().unique())
 
         country = st.sidebar.multiselect('Select a Country/Border/Sea', countries)
-        if country !=None:
-            result_df = result_df.loc[df.Countries.isin(country)]
+        if len(country) == 1:
+            result_df = result_df.loc[result_df.Countries == country[0]]
+            
+        elif len(country) >1:
+            result_df = result_df.loc[result_df.Countries.isin(country)]
             
             countries_df = {}
             countries_df = {elem : pd.DataFrame() for elem in country}
             for i in countries_df:
                 countries_df[i] = pd.DataFrame(result_df.loc[result_df.Countries == i])
+
 
             #stats by chosen country    
             if len(country)>1:
@@ -161,7 +172,7 @@ if st.sidebar.checkbox("Filter by Location", False):
 
                     region = st.sidebar.multiselect('Select region', regions)
                     if 'All' not in region:
-                        result_df = result_df.loc[df.region_name.isin(region)]
+                        result_df = result_df.loc[result_df.region_name.isin(region)]
 
                         region_df = {}
                         region_df = {elem : pd.DataFrame() for elem in region}
@@ -188,11 +199,21 @@ if st.sidebar.checkbox("Filter by Location", False):
             result_df = result_df
 #########################################################################################################
 
-st.write('### Filter results: : ' ,result_df.shape[0], ' earthquakes detected')
+st.write('### Filter results: ' ,result_df.shape[0], ' earthquakes detected')
 st.write('### From (date): `%s` To (date):`%s`' % (result_df['date_time_utc'].dt.date.min(), result_df['date_time_utc'].dt.date.max()))
 # Map
 st.map(result_df)
 #Raw data display
-if st.checkbox("Show Raw Data", False):
-    st.subheader('Raw Data')
-    st.write(result_df)
+if st.checkbox("Show Detailed Data", False):
+    st.write(result_df.drop('date_time_utc', axis=1))
+
+#visually dividing section
+st.write('___________________________________________________________________________________________________')
+#footer
+st.write('''\n[Check the data cleaning Jupiter Notebook here](https://github.com/beksultankarimov/earthequakes-streamlit/blob/main/Earthquakes_Data_Cleaning_.ipynb)''')
+st.write('''\n[Check the EDA Jupiter Notebook here](https://github.com/beksultankarimov/earthequakes-streamlit/blob/main/Earthquake_EDA.ipynb)''')
+st.write('___________________________________________________________________________________________________')
+st.write('This project was done by: **Beksultan Karimov**')
+st.write('''\n[LinkedIn](https://www.linkedin.com/in/beksultan-karimov-6a4296179/)''')
+st.write('''[Facebook](https://www.facebook.com/profile.php?id=100009130718211)''')
+st.write('''[GitHub](https://github.com/beksultankarimov)''')
