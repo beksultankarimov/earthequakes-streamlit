@@ -215,7 +215,7 @@ st.write('''\n[Check the EDA Jupiter Notebook here](https://github.com/beksultan
 st.write('___________________________________________________________________________________________________')
 st.write('This project was done by: **Beksultan Karimov**')
 st.write('Check my other ' , '''[Warsaw Flat Price Prediction app](https://warsaw-flat-prediction.herokuapp.com)''')
-st.write('''\n[Get my CV](https://drive.google.com/file/d/1yrBoLqFLD_0Qxa10lM8Zjhx2w3GGX4xl/view?usp=sharing)''')
+st.write('''\n[Get my CV](https://drive.google.com/file/d/1BXSu5kxACVeEDCr8gL95Dhn_v_yTZRXI/view?usp=sharing)''')
 st.write('''\n[LinkedIn](https://www.linkedin.com/in/beksultan-karimov-6a4296179/)''')
 st.write('''[Facebook](https://www.facebook.com/profile.php?id=100009130718211)''')
 st.write('''[GitHub](https://github.com/beksultankarimov)''')
